@@ -55,6 +55,7 @@ import org.jetbrains.kotlin.psi.stubs.KotlinClassOrObjectStub
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import java.util.*
 import javax.swing.Icon
+import kotlin.jvm.Throws
 
 private class KtLightClassModifierList(containingClass: KtLightClassForSourceDeclaration, computeModifiers: () -> Set<String>) :
     KtLightModifierList<KtLightClassForSourceDeclaration>(containingClass) {
@@ -349,6 +350,8 @@ abstract class KtLightClassForSourceDeclaration(
             if (classOrObject.shouldNotBeVisibleAsLightClass()) {
                 return null
             }
+
+            return LightClassGenerationSupport.getInstance(classOrObject.project).createUltraLightClass(classOrObject)
 
             if (!forceUsingOldLightClasses && Registry.`is`("kotlin.use.ultra.light.classes", true)) {
                 LightClassGenerationSupport.getInstance(classOrObject.project).createUltraLightClass(classOrObject)?.let { return it }
