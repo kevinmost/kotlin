@@ -119,7 +119,7 @@ class PropertyReferenceCodegen(
                 aconst(target.name.asString())
             }
             generateMethod("property reference getSignature", ACC_PUBLIC, method("getSignature", JAVA_STRING_TYPE)) {
-                generateCallableReferenceSignature(this, target, state)
+                generatePropertyReferenceSignature(this, target, state)
             }
             generateMethod("property reference getOwner", ACC_PUBLIC, method("getOwner", K_DECLARATION_CONTAINER_TYPE)) {
                 ClosureCodegen.generateCallableReferenceDeclarationContainer(this, target, state)
@@ -149,7 +149,7 @@ class PropertyReferenceCodegen(
             if (isOptimizedPropertyReferenceSupertype(superAsmType)) {
                 ClosureCodegen.generateCallableReferenceDeclarationContainerClass(this, target, state)
                 aconst(target.name.asString())
-                generateCallableReferenceSignature(this, target, state)
+                generatePropertyReferenceSignature(this, target, state)
                 aconst(if (ClosureCodegen.isTopLevelCallableReference(target)) 1 else 0)
                 superCtorArgTypes.add(JAVA_CLASS_TYPE)
                 superCtorArgTypes.add(JAVA_STRING_TYPE)
@@ -241,12 +241,23 @@ class PropertyReferenceCodegen(
         })
 
         @JvmStatic
-        fun generateCallableReferenceSignature(iv: InstructionAdapter, callable: CallableDescriptor, state: GenerationState) {
-            iv.aconst(getSignatureString(callable, state))
+        fun generateCallableReferenceSignature(
+            iv: InstructionAdapter,
+            callable: CallableDescriptor,
+            state: GenerationState
+        ) {
+            iv.aconst(getSignatureString(callable, state, isPropertySignature = false))
         }
 
-        @JvmStatic
-        fun getSignatureString(callable: CallableDescriptor, state: GenerationState): String {
+        fun generatePropertyReferenceSignature(
+            iv: InstructionAdapter,
+            callable: CallableDescriptor,
+            state: GenerationState
+        ) {
+            iv.aconst(getSignatureString(callable, state, isPropertySignature = true))
+        }
+
+        private fun getSignatureString(callable: CallableDescriptor, state: GenerationState, isPropertySignature: Boolean = false): String {
             if (callable is LocalVariableDescriptor) {
                 val asmType = state.bindingContext.get(CodegenBinding.DELEGATED_PROPERTY_METADATA_OWNER, callable)
                     ?: throw AssertionError("No delegated property metadata owner for $callable")
@@ -272,11 +283,14 @@ class PropertyReferenceCodegen(
                 else -> error("Unsupported callable reference: $callable")
             }
             val declaration = DescriptorUtils.unwrapFakeOverride(accessor).original
-            val method =
-                if (callable.containingDeclaration.isInlineClass() && !declaration.isGetterOfUnderlyingPropertyOfInlineClass())
+            val method = when {
+                callable.containingDeclaration.isInlineClass() && !declaration.isGetterOfUnderlyingPropertyOfInlineClass() ->
                     state.typeMapper.mapSignatureForInlineErasedClassSkipGeneric(declaration).asmMethod
-                else
+                isPropertySignature ->
+                    state.typeMapper.mapPropertyReferenceSignature(declaration)
+                else ->
                     state.typeMapper.mapAsmMethod(declaration)
+            }
             return method.name + method.descriptor
         }
 
